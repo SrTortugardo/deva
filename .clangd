@@ -1,0 +1,10 @@
+CompileFlags:
+  Add:
+    - "-I/home/srtortugardo/code/deva/kernel/include" # deberias remplazar esto con la ruta de **TU** Dispostivo
+    - "-ffreestanding"
+    - "-nostdlib"
+    - "-fno-builtin"
+
+Diagnostics:
+  ClangTidy:
+    Remove: [modernize-*]

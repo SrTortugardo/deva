@@ -1,9 +1,16 @@
 #!/bin/sh
-# Para GNU/Linux
-COMPILER=gcc
-LINKER=ld
-AS=nasm
+set -e
 
+if [ "$(uname -m)" = "aarch64" ]; then
+    COMPILER=i686-elf-gcc
+    LINKER=i686-elf-ld
+else
+    # x86_64, se puede compilar con las herramientas del host
+    COMPILER=gcc
+    LINKER=ld
+fi
+
+AS=nasm # no depende de la arquitectura
 CFLAGS="-m32 -ffreestanding -nostdlib -Ikernel/include -nostdinc"
 RUST_FLAGS="--target i686-unknown-linux-gnu -C panic=abort -O --emit=obj -o " # tengo planeado usar rust
 

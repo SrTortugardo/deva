@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define MULTIBOOT_BOOTLOADER_MAGIC 0x2BADB002
+
 typedef struct {
   uint32_t flags;
 

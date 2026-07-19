@@ -6,8 +6,8 @@ if [ "$(uname -m)" = "aarch64" ]; then
     LINKER=i686-elf-ld
 else
     # x86_64, se puede compilar con las herramientas del host
-    COMPILER=gcc
-    LINKER=ld
+    COMPILER=clang
+    LINKER=ld.lld
 fi
 
 AS=nasm # no depende de la arquitectura

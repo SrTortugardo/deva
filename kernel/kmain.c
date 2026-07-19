@@ -14,8 +14,9 @@
 void kmain(uint32_t magic, multiboot_info_t *bootinfo) {
   /* Si no entramos por un bootloader multiboot valido, bootinfo es basura. */
   if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
-    for (;;)
-      __asm__ volatile("hlt");
+    for (;;) {
+      halt();
+    }
   }
 
   video_init((uint32_t *)(uintptr_t)bootinfo->framebuffer_addr,
@@ -33,12 +34,10 @@ void kmain(uint32_t magic, multiboot_info_t *bootinfo) {
   irq_unmask(); /* desenmascarar IRQ0 (timer) e IRQ1 (teclado) en el PIC */
   term_init();
   term_write("Paralilepipedo\n", COLOR_MAGENTA);
-  kprint("Esternocleidomastoideo\n");
-  kprint("Manzana verde\n");
 
   enable_interrupts();
 
-  while (1 < 2) {
+  for (;;) {
     halt();
   }
 }

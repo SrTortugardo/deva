@@ -79,3 +79,37 @@ ISR_NOERR 28
 ISR_NOERR 29
 ISR_ERR   30
 ISR_NOERR 31
+
+global isr128
+isr128:
+    cli
+    push dword 0          ; err_code falso
+    push dword 128        ; int_no
+    jmp syscall_common_stub
+
+extern syscall_handler_c
+syscall_common_stub:
+    pusha
+    push ds
+    push es
+    push fs
+    push gs
+
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    push esp
+    call syscall_handler_c
+    add esp, 4
+
+    pop gs
+    pop fs
+    pop es
+    pop ds
+    popa
+
+    add esp, 8
+    iret

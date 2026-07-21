@@ -61,6 +61,9 @@ DECL_ISR(31);
 extern void irq0_handler();
 extern void irq1_handler();
 
+/* Syscall via int 0x80 */
+extern void isr128(void);
+
 static struct idt_entry idt[256];
 static struct idt_ptr idtp;
 
@@ -74,8 +77,6 @@ static void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel,
 }
 
 extern void remap_pic(void); /* definido en irq.c */
-/* pronto llegan las syscalls y isr 128 se usara */
-// extern void isr128(void);
 
 void idt_init(void) {
   memset(&idt, 0, sizeof(idt));
@@ -120,7 +121,9 @@ void idt_init(void) {
   /* IRQs */
   idt_set_gate(32, (uint32_t)irq0_handler, 0x08, 0x8E);
   idt_set_gate(33, (uint32_t)irq1_handler, 0x08, 0x8E);
-  // idt_set_gate(128, (uint32_t)isr128, 0x08, 0xEE);
+
+  /* Syscall: DPL=3 (0xEE) para que se pueda invocar desde user space */
+  idt_set_gate(128, (uint32_t)isr128, 0x08, 0xEE);
 
   idtp.limit = sizeof(idt) - 1;
   idtp.base = (uint32_t)&idt;

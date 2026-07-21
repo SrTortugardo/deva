@@ -1,11 +1,25 @@
+/* bueno, este driver me dio muchos dolores de cabeza, y lo odio, pero quedo */
+/* para escribir en sector se hace :
+ * 1. esperar que el disco no este BSY
+ * 2. seleccionar el drive y esperarar a que este DRDDY
+ * 3. cargar lba y cantidad de sectores en su registros
+ * 4. enviar el comando (read, write)
+ * 5. esperar a que haya datos y copear 256 words del/als puerto DATA*/
 #include <ata.h>
 #include <cpu.h>
 
+/* Tabla con los dispositivos detectados, estan en orden de deteccion. */
 static ata_device_t drives[MAX_DRIVES];
-static int drive_count = 0;
-static int selected_drive = -1;
+static int drive_count = 0; /* cuantos discos se encontraron */
+static int selected_drive =
+    -1; /* indice en drives[] del disco activo, -1 si ninguno */
 
 static int ata_wait_bsy(uint16_t io_base) {
+  /*
+   * Espera a que se baje el bit BSY (el disco dejo de procesar el comando
+   * anterior). Devuelve 0 si se libera a tiempo, -1 si se agota el tiempo.
+   */
+
   int timeout = 100000;
   while ((inb(io_base + ATA_REG_STATUS) & ATA_SR_BSY) && timeout > 0) {
     timeout--;
@@ -14,6 +28,7 @@ static int ata_wait_bsy(uint16_t io_base) {
 }
 
 static int ata_wait_drq(uint16_t io_base) {
+  /* esperar a que este listo el bit DRQ, si se acaba el tiempo pos -1 igual*/
   int timeout = 100000;
   while (!(inb(io_base + ATA_REG_STATUS) & ATA_SR_DRQ) && timeout > 0) {
     timeout--;
@@ -32,12 +47,14 @@ static int ata_identify(uint16_t io_base, uint8_t drive, ata_device_t *device) {
   device->drive = drive;
   device->present = 0;
 
+  /* Seleccionar drive (0xA0 = master sin LBA, 0xB0 = slave sin LBA). */
   outb(io_base + ATA_REG_DRIVE, 0xA0 | (drive << 4));
   ata_400ns_delay(io_base);
 
   outb(io_base + ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
   ata_400ns_delay(io_base);
 
+  /* Si status=0 el bus responde aunque no haya dispositivo. */
   uint8_t status = inb(io_base + ATA_REG_STATUS);
   if (status == 0) {
     return 0;
@@ -58,6 +75,7 @@ static int ata_identify(uint16_t io_base, uint8_t drive, ata_device_t *device) {
     return 0;
   }
 
+  /* Leer las 256 words del IDENTIFY. */
   uint16_t identify[256];
   for (int i = 0; i < 256; i++) {
     identify[i] = inw(io_base + ATA_REG_DATA);
@@ -69,6 +87,7 @@ static int ata_identify(uint16_t io_base, uint8_t drive, ata_device_t *device) {
   }
   device->model[40] = '\0';
 
+  /* Recortar espacios a la derecha (los discos suelen paddear con ' '). */
   for (int i = 39; i >= 0; i--) {
     if (device->model[i] == ' ') {
       device->model[i] = '\0';
@@ -84,7 +103,8 @@ static int ata_identify(uint16_t io_base, uint8_t drive, ata_device_t *device) {
   } else {
     device->sectors = ((uint32_t)identify[61] << 16) | identify[60];
   }
-  device->size_mb = device->sectors / 2048;
+  device->size_mb =
+      device->sectors / 2048; /* 2048 sectores = 1 MiB (512 B c/u) */
   device->is_removable = (identify[0] & 0x80) ? 1 : 0;
 
   device->present = 1;
@@ -92,6 +112,7 @@ static int ata_identify(uint16_t io_base, uint8_t drive, ata_device_t *device) {
 }
 
 void ata_init(void) {
+  /* Resetea la tabla de dispositivos. No toca el hardware. */
   for (int i = 0; i < MAX_DRIVES; i++) {
     drives[i].present = 0;
     drives[i].io_base = 0;
@@ -123,6 +144,7 @@ int ata_detect_drives(void) {
   return drive_count;
 }
 
+/* por si en el futuro ocupamos esta funcion esta */
 void ata_print_drives(void) {}
 
 int ata_select_drive(int drive_num) {
@@ -144,6 +166,8 @@ int ata_select_drive(int drive_num) {
     return -1;
   }
 
+  /* DRDY debe estar seteo para poder mandar comandos. Algunos discos
+   * (removibles sin medio) nunca lo setean. */
   uint8_t status = inb(io_base + ATA_REG_STATUS);
   if (!(status & ATA_SR_DRDY)) {
     return -1;
@@ -181,6 +205,8 @@ int ata_write_sector(uint32_t lba, const uint8_t *buffer) {
     return -1;
   }
 
+  /* 0xE0 = bit 7 (siempre 1) + bit 6 (LBA on) + bit 5 (siempre 1).
+   * En los 4 bits bajos van los bits 24..27 del LBA. */
   outb(io_base + ATA_REG_DRIVE,
        0xE0 | (dev->drive << 4) | ((lba >> 24) & 0x0F));
   ata_400ns_delay(io_base);
@@ -196,6 +222,7 @@ int ata_write_sector(uint32_t lba, const uint8_t *buffer) {
     return -1;
   }
 
+  /* 256 words = 512 bytes = un sector. outw al puerto DATA envia la data. */
   const uint16_t *buf16 = (const uint16_t *)buffer;
   for (int i = 0; i < 256; i++) {
     outw(io_base + ATA_REG_DATA, buf16[i]);
@@ -240,6 +267,7 @@ int ata_read_sector(uint32_t lba, uint8_t *buffer) {
     return -1;
   }
 
+  /* 256 words = 512 bytes. inw desde el puerto DATA entrega la data. */
   uint16_t *buf16 = (uint16_t *)buffer;
   for (int i = 0; i < 256; i++) {
     buf16[i] = inw(io_base + ATA_REG_DATA);

@@ -21,14 +21,6 @@ SECTIONS
         *(.data)
     }
 
-    /* ya no pienso usar programas asi, pero bueno, se queda */
-    .programs :
-    {
-        _prog_start = .;
-        *(.programs)
-        _prog_end = .;
-    }
-
     .bss :
     {
         __bss_start = .;

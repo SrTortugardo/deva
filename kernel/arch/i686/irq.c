@@ -1,6 +1,7 @@
 #include <cpu.h>
 #include <interrupts.h>
 #include <stdint.h>
+#include <task/task.h>
 
 #define PIC1 0x20
 #define PIC2 0xA0
@@ -66,19 +67,23 @@ volatile uint32_t timer_ticks = 0;
 void irq_handler_c(struct regs *r) {
   int irq = r->int_no - 32;
 
+  /* EOI temprano: como schedule() puede hacer context_switch a una tarea
+   * nueva que arrancara con sti, necesitamos que el PIC ya no este
+   * asserting IRQ0; si no, el sti re-dispararia el timer al instante. */
+  if (r->int_no >= 40)
+    outb(0xA0, 0x20);
+  outb(0x20, 0x20);
+
   if (irq == 0) {
     timer_ticks++;
+    /* Multitarea preemptiva: en cada tick del timer se cambia de tarea. */
+    schedule();
   }
   /* Keyboard - llama handler */
   else if (irq == 1) {
     if (irq_routines[1])
       irq_routines[1]();
   }
-
-  if (r->int_no >= 40)
-    outb(0xA0, 0x20);
-
-  outb(0x20, 0x20);
 }
 
 void enable_interrupts(void) { asm volatile("sti"); }

@@ -7,6 +7,7 @@
  * 5. esperar a que haya datos y copear 256 words del/als puerto DATA*/
 #include <ata.h>
 #include <cpu.h>
+#include <drivers.h>
 
 /* Tabla con los dispositivos detectados, estan en orden de deteccion. */
 static ata_device_t drives[MAX_DRIVES];
@@ -109,7 +110,7 @@ static int ata_identify(uint16_t io_base, uint8_t drive, ata_device_t *device) {
   return 1;
 }
 
-void ata_init(void) {
+int ata_init(void) {
   /* Resetea la tabla de dispositivos. No toca el hardware. */
   for (int i = 0; i < MAX_DRIVES; i++) {
     drives[i].present = 0;
@@ -118,6 +119,8 @@ void ata_init(void) {
 
   drive_count = 0;
   selected_drive = -1;
+
+  return 0;
 }
 
 int ata_detect_drives(void) {
@@ -275,3 +278,8 @@ int ata_read_sector(uint32_t lba, uint8_t *buffer) {
 
   return 0;
 }
+
+static struct driver ata = {
+    .name = "ATA", .author = "SrTortugardo", .version = 1, .init = ata_init};
+
+void ata_register(void) { driver_register(&ata); }

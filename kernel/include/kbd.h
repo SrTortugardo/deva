@@ -9,4 +9,6 @@ void keyboard_handler(void);
 int kbd_pop(void);
 int kbd_readline(char *buf, int max); /* leer linea terminada por \n */
 
+void keyboard_register();
+
 #endif

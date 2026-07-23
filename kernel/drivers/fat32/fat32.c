@@ -30,7 +30,6 @@ static uint32_t fat_cache_sector;
 static uint8_t cluster_buf[MAX_CLUSTER_SECTORS * 512];
 
 void fat32_init(void) {
-  ata_init();
   ata_detect_drives();
   ata_select_drive(0);
 

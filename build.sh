@@ -38,6 +38,7 @@ kernel() {
     $COMPILER $CFLAGS -c kernel/assets/font8x8.c -o build/kernel/font8x8.o
 
     # DRIVERS
+    $COMPILER $CFLAGS -c kernel/drivers/drivers.c -o build/kernel/drivers.o
     $COMPILER $CFLAGS -c kernel/drivers/framebuffer/framebuffer.c -o build/kernel/framebuffer.o
     $COMPILER $CFLAGS -c kernel/drivers/text/text.c -o build/kernel/text.o
     $COMPILER $CFLAGS -c kernel/drivers/term/term.c -o build/kernel/term.o

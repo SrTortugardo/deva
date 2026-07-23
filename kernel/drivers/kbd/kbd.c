@@ -1,6 +1,7 @@
 #include <arch/i686.h>
 #include <colors.h>
 #include <cpu.h>
+#include <drivers.h>
 #include <stdint.h>
 #include <term.h>
 
@@ -146,3 +147,12 @@ void keyboard_handler(void) {
     }
   }
 }
+
+static int keyboard_init(void) { return 0; /* No se que poner aqui */ }
+
+static struct driver keyboard = {.name = "Teclado PS/2",
+                                 .author = "SrTortugardo",
+                                 .version = 1,
+                                 .init = keyboard_init};
+
+void keyboard_register() { driver_register(&keyboard); }

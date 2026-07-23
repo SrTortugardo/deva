@@ -1,7 +1,6 @@
-# deva : sistema operativo
+# deva : operating system
 deva is a operating system writed from scratch, and under public domain
 ![bmp](assets/bmp.png)
-![lobo](assets/lobo.png)
 ![term](assets/term.png)
 
 ## ¿What can you expect?
@@ -9,7 +8,7 @@ deva is a operating system writed from scratch, and under public domain
 - Developers : bad design
 
 ## FEATURES
-### Dispositivos soportados
+### supported devices
 - ATA
 - Keyboard
 

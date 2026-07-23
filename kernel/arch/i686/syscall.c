@@ -1,12 +1,13 @@
+#include <arch/i686.h>
 #include <colors.h>
 #include <framebuffer.h>
 #include <interrupts.h>
-#include <kbd.h>
 #include <mm/mm.h>
 #include <stdint.h>
 #include <syscall/syscall.h>
 #include <task/task.h>
 #include <term.h>
+#include <tty.h>
 #include <vfs.h>
 
 void syscall_handler_c(struct regs *r) {
@@ -64,7 +65,8 @@ void syscall_handler_c(struct regs *r) {
     task_t *next = get_current_task();
     task_t *start = next;
     do {
-      if (next->state == TASK_RUNNING) break;
+      if (next->state == TASK_RUNNING)
+        break;
       next = next->next;
     } while (next != start);
 
@@ -89,10 +91,10 @@ void syscall_handler_c(struct regs *r) {
     break;
   }
   case SYS_READ: {
-    /* fd ignorado: siempre stdin (teclado). Lee hasta len-1 o \n. */
     char *buf = (char *)(uintptr_t)r->ecx;
     int max = (int)r->edx;
-    r->eax = (uint32_t)kbd_readline(buf, max);
+    enable_interrupts();
+    r->eax = (uint32_t)tty_readline(&tty0, buf, max);
     break;
   }
   case SYS_YIELD:

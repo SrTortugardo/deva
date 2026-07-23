@@ -2,6 +2,9 @@
 #define TERM_H
 
 #include <stdint.h>
+#include <tty.h>
+
+extern tty_t tty0;
 
 void term_init(void);
 void term_clear(void);

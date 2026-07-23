@@ -13,6 +13,7 @@
 #define ATTR_ARCHIVE 0x20
 #define MAX_CLUSTER_SECTORS 8
 
+/* Parametros del filesystem leidos del BPB */
 static struct {
   uint16_t bytes_per_sector;
   uint8_t sectors_per_cluster;
@@ -25,10 +26,12 @@ static struct {
   uint32_t cluster_bytes;
 } fs;
 
-static uint8_t fat_cache[512];
-static uint32_t fat_cache_sector;
-static uint8_t cluster_buf[MAX_CLUSTER_SECTORS * 512];
+static uint8_t fat_cache[512];    /* cache de un sector FAT */
+static uint32_t fat_cache_sector; /* sector actual en cache */
+static uint8_t
+    cluster_buf[MAX_CLUSTER_SECTORS * 512]; /* buffer para un cluster */
 
+/* Inicializa el driver: lee el BPB del disco 0 */
 void fat32_init(void) {
   ata_detect_drives();
   ata_select_drive(0);
@@ -51,10 +54,12 @@ void fat32_init(void) {
   fat_cache_sector = 0xFFFFFFFF;
 }
 
+/* Convierte numero de cluster a LBA del primer sector */
 static uint32_t cluster_to_lba(uint32_t cluster) {
   return fs.data_start + (cluster - 2) * fs.sectors_per_cluster;
 }
 
+/* Lee un cluster completo a buf */
 static int read_cluster(uint32_t cluster, uint8_t *buf) {
   uint32_t lba = cluster_to_lba(cluster);
   for (uint32_t i = 0; i < fs.sectors_per_cluster; i++)
@@ -63,6 +68,7 @@ static int read_cluster(uint32_t cluster, uint8_t *buf) {
   return 0;
 }
 
+/* Escribe buf en un cluster completo */
 static int write_cluster(uint32_t cluster, const uint8_t *buf) {
   uint32_t lba = cluster_to_lba(cluster);
   for (uint32_t i = 0; i < fs.sectors_per_cluster; i++)
@@ -71,8 +77,10 @@ static int write_cluster(uint32_t cluster, const uint8_t *buf) {
   return 0;
 }
 
+/* True si cluster es End-Of-Chain */
 static int is_eoc(uint32_t cluster) { return cluster >= FAT_EOC; }
 
+/* Lee el valor de la FAT para un cluster */
 static uint32_t fat_read(uint32_t cluster) {
   uint32_t fat_offset = cluster * 4;
   uint32_t sector = fs.fat_start + fat_offset / fs.bytes_per_sector;
@@ -85,6 +93,7 @@ static uint32_t fat_read(uint32_t cluster) {
   return *(uint32_t *)(fat_cache + off) & FAT_MASK;
 }
 
+/* Escribe value en la entrada FAT de cluster (todas las copias) */
 static void fat_write(uint32_t cluster, uint32_t value) {
   uint32_t fat_offset = cluster * 4;
   uint32_t sector = fs.fat_start + fat_offset / fs.bytes_per_sector;
@@ -102,6 +111,7 @@ static void fat_write(uint32_t cluster, uint32_t value) {
     *(uint32_t *)(fat_cache + off) = value;
 }
 
+/* Busca un cluster libre en la FAT */
 static uint32_t fat_find_free(void) {
   uint32_t total = (fs.fat_size_sectors * fs.bytes_per_sector) / 4;
   for (uint32_t c = 2; c < total; c++)
@@ -110,6 +120,7 @@ static uint32_t fat_find_free(void) {
   return 0;
 }
 
+/* Reserva un cluster y lo marca como EOC */
 static uint32_t fat_alloc(void) {
   uint32_t c = fat_find_free();
   if (c)
@@ -117,6 +128,7 @@ static uint32_t fat_alloc(void) {
   return c;
 }
 
+/* Libera toda la cadena de clusters desde cluster */
 static void fat_free_chain(uint32_t cluster) {
   while (!is_eoc(cluster) && cluster >= 2) {
     uint32_t next = fat_read(cluster);
@@ -125,6 +137,7 @@ static void fat_free_chain(uint32_t cluster) {
   }
 }
 
+/* Convierte nombre largo a formato 8.3 (mayusculas, sin LFN) */
 static void to_83(const char *name, uint8_t out[11]) {
   memset(out, ' ', 11);
   int i;
@@ -147,6 +160,7 @@ static void to_83(const char *name, uint8_t out[11]) {
   }
 }
 
+/* Convierte una entrada 8.3 a nombre legible */
 static void from_83(const uint8_t *entry, char *out) {
   int j = 0;
   for (int i = 0; i < 8 && entry[i] != ' '; i++)
@@ -159,6 +173,7 @@ static void from_83(const uint8_t *entry, char *out) {
   out[j] = '\0';
 }
 
+/* Busca name en el directorio, devuelve su primer cluster */
 static uint32_t find_in_dir(uint32_t dir_cluster, const char *name,
                             uint32_t *size_out) {
   uint8_t target[11];
@@ -191,6 +206,7 @@ static uint32_t find_in_dir(uint32_t dir_cluster, const char *name,
   return 0;
 }
 
+/* Busca name y devuelve cluster/offset de la entrada */
 static int find_entry(uint32_t dir_cluster, const char *name,
                       uint32_t *out_cluster, uint32_t *out_offset,
                       uint32_t *size_out) {
@@ -226,6 +242,7 @@ static int find_entry(uint32_t dir_cluster, const char *name,
   return 0;
 }
 
+/* Resuelve un path completo a su cluster, opcionalmente devuelve size */
 static uint32_t resolve_path(const char *path, uint32_t *size_out) {
   if (!path)
     return 0;
@@ -369,6 +386,7 @@ static int find_free_dir_slot(uint32_t dir_cluster, uint32_t *out_cluster,
   return 1;
 }
 
+/* Modifica una entrada de directorio en disco */
 static int modify_dir_entry(uint32_t cluster, uint32_t offset,
                             const uint8_t entry[32]) {
   if (read_cluster(cluster, cluster_buf) < 0)
@@ -377,6 +395,7 @@ static int modify_dir_entry(uint32_t cluster, uint32_t offset,
   return write_cluster(cluster, cluster_buf);
 }
 
+/* Agrega una entrada de archivo/directorio al directorio */
 static int dir_add_entry(uint32_t dir_cluster, const char *name, uint8_t attr,
                          uint32_t first_cluster, uint32_t size) {
   uint32_t ec, eo;
@@ -399,6 +418,7 @@ static int dir_add_entry(uint32_t dir_cluster, const char *name, uint8_t attr,
   return modify_dir_entry(ec, eo, entry);
 }
 
+/* Inicializa un directorio nuevo con las entradas . y .. */
 static int dir_init(uint32_t dir_cluster, uint32_t parent_cluster) {
   memset(cluster_buf, 0, fs.cluster_bytes);
 
@@ -418,6 +438,7 @@ static int dir_init(uint32_t dir_cluster, uint32_t parent_cluster) {
   return write_cluster(dir_cluster, cluster_buf);
 }
 
+/* Marca una entrada como eliminada (0xE5) */
 static int delete_entry_in_dir(uint32_t dir_cluster, const char *name) {
   uint32_t ec, eo;
   if (!find_entry(dir_cluster, name, &ec, &eo, 0))
@@ -431,6 +452,7 @@ static int delete_entry_in_dir(uint32_t dir_cluster, const char *name) {
 
 /* --- Public API --- */
 
+/* Lee hasta max_size bytes de un archivo desde offset */
 int fat32_read(const char *path, uint8_t *buf, uint32_t max_size,
                uint32_t offset) {
   uint32_t size;
@@ -477,7 +499,7 @@ int fat32_read(const char *path, uint8_t *buf, uint32_t max_size,
   return (int)read_bytes;
 }
 
-/* Escribe `size` bytes de `buf` en `path` */
+/* Escribe size bytes de buf en path (reemplaza si existe) */
 int fat32_write(const char *path, const uint8_t *buf, uint32_t size) {
   if (!path || !buf)
     return -1;
@@ -536,6 +558,7 @@ int fat32_write(const char *path, const uint8_t *buf, uint32_t size) {
   return (int)size;
 }
 
+/* Crea un archivo o directorio vacio */
 int fat32_create(const char *path, int is_dir) {
   if (!path)
     return -1;
@@ -561,6 +584,7 @@ int fat32_create(const char *path, int is_dir) {
   return dir_add_entry(parent, leaf, ATTR_ARCHIVE, 0, 0);
 }
 
+/* Elimina un archivo (libera clusters y marca la entrada) */
 int fat32_delete(const char *path) {
   if (!path)
     return -1;
@@ -580,6 +604,7 @@ int fat32_delete(const char *path) {
   return delete_entry_in_dir(parent, leaf);
 }
 
+/* Borra recursivamente el contenido de un directorio */
 static int delete_recursive(uint32_t dir_cluster) {
   if (dir_cluster < 2)
     return 0;
@@ -615,6 +640,7 @@ done_del:
   return write_cluster(dir_cluster, cluster_buf);
 }
 
+/* Elimina un directorio y todo su contenido */
 int fat32_delete_recursive(const char *path) {
   if (!path)
     return -1;
@@ -637,6 +663,7 @@ int fat32_delete_recursive(const char *path) {
   return delete_entry_in_dir(parent, leaf);
 }
 
+/* Verifica si un path existe en el filesystem */
 int fat32_exists(const char *path) {
   char leaf[64];
   uint32_t parent = resolve_parent(path, leaf, 64);
@@ -646,6 +673,7 @@ int fat32_exists(const char *path) {
   return find_entry(parent, leaf, &ec, &eo, 0);
 }
 
+/* Lista el contenido de un directorio por pantalla */
 void fat32_list(const char *path) {
   uint32_t dir_cluster;
 
@@ -701,6 +729,7 @@ done:
     term_write("(vacio)\n", COLOR_GRAY);
 }
 
+/* Obtiene informacion de un archivo o directorio */
 int fat32_stat(const char *path, fat32_stat_t *out) {
   if (!path || !out)
     return -1;

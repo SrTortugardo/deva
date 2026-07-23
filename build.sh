@@ -42,6 +42,8 @@ kernel() {
     $COMPILER $CFLAGS -c kernel/drivers/framebuffer/framebuffer.c -o build/kernel/framebuffer.o
     $COMPILER $CFLAGS -c kernel/drivers/text/text.c -o build/kernel/text.o
     $COMPILER $CFLAGS -c kernel/drivers/term/term.c -o build/kernel/term.o
+    $COMPILER $CFLAGS -c kernel/drivers/term/tty.c -o build/kernel/tty.o
+    $COMPILER $CFLAGS -c kernel/drivers/term/tty_fb.c -o build/kernel/tty_fb.o
     $COMPILER $CFLAGS -c kernel/drivers/gdt/gdt.c -o build/kernel/gdt.o
     $COMPILER $CFLAGS -c kernel/drivers/elf/elf.c -o build/kernel/elf.o
     $COMPILER $CFLAGS -c kernel/drivers/paging/paging.c -o build/kernel/paging.o

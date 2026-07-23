@@ -1,84 +1,33 @@
-#include <arch/i686.h>
-#include <colors.h>
 #include <cpu.h>
 #include <drivers.h>
 #include <stdint.h>
-#include <term.h>
+#include <tty.h>
 
-/* Estado */
 static int shift = 0;
 static int ctrl = 0;
 static int extended = 0;
 
-/* BUFFER CIRCULAR */
 #define KBD_BUF_SIZE 256
-static char kbd_buf[KBD_BUF_SIZE];
+static key_event_t kbd_buf[KBD_BUF_SIZE];
 static volatile int kbd_head = 0;
 static volatile int kbd_tail = 0;
 
-static void kbd_push(char c) {
-  int next = (kbd_head + 1) % KBD_BUF_SIZE; /* siguiente posicion circular */
+static void kbd_push_key(key_event_t ev) {
+  int next = (kbd_head + 1) % KBD_BUF_SIZE;
   if (next == kbd_tail)
-    return; /* buffer lleno, descartamos el caracter */
-
-  kbd_buf[kbd_head] = c;
+    return;
+  kbd_buf[kbd_head] = ev;
   kbd_head = next;
 }
 
-/* Saca el proximo char o -1 si vacio. */
-int kbd_pop(void) {
+int kbd_get_key(key_event_t *ev) {
   if (kbd_head == kbd_tail)
-    return -1; /* buffer vacio */
-  char c = kbd_buf[kbd_tail];
-  kbd_tail =
-      (kbd_tail + 1) % KBD_BUF_SIZE; /* avanzamos la cola circularmente */
-  return (int)(unsigned char)c;
-}
-
-int kbd_readline(char *buf, int max) {
-  int n = 0;
-  if (max <= 0)
     return 0;
-
-  enable_interrupts();
-
-  for (;;) {
-    int c = kbd_pop();
-    if (c < 0) {
-      halt(); /* no hay tecla, detenemos el CPU hasta la proxima interrupcion */
-      continue;
-    }
-
-    if (c == '\n') {
-      term_putchar('\n', COLOR_TEXT);
-      break;
-    }
-    if (c == '\f') {
-      buf[0] = '\f'; /* Ctrl+L: devolver \f al usuario para que la shell */
-      buf[1] = '\0'; /* ejecute /bin/clear y redibuje el prompt         */
-      return 1;
-    }
-    if (c == '\b') {
-      if (n > 0) {
-        n--;
-        term_putchar('\b', COLOR_TEXT); /* mover cursor atras */
-        term_putchar(' ', COLOR_TEXT);  /* pintar espacio para borrar */
-        term_putchar('\b', COLOR_TEXT); /* mover cursor atras de nuevo */
-      }
-      continue;
-    }
-
-    if (n < max - 1) { /* dejamos espacio para el null terminator */
-      buf[n++] = (char)c;
-      term_putchar((char)c, COLOR_TEXT);
-    }
-  }
-
-  buf[n] = '\0';
-  return n;
+  *ev = kbd_buf[kbd_tail];
+  kbd_tail = (kbd_tail + 1) % KBD_BUF_SIZE;
+  return 1;
 }
 
-/* Keymaps */
 static const uint8_t kbd_map[58] = {
     0,   27,  '1',  '2',  '3',  '4', '5', '6',  '7', '8', '9', '0',
     '-', '=', '\b', '\t', 'q',  'w', 'e', 'r',  't', 'y', 'u', 'i',
@@ -94,61 +43,84 @@ static const uint8_t kbd_shift_map[58] = {
     'B', 'N', 'M',  '<',  '>',  '?', 0,   '*', 0,   ' '};
 
 void keyboard_handler(void) {
-  uint8_t sc = inb(0x60); /* leemos el scancode del puerto del teclado */
+  uint8_t sc = inb(0x60);
 
-  if (sc == 0xE0) { /* prefijo de tecla extendida (flechas, home, etc) */
+  if (sc == 0xE0) {
     extended = 1;
     return;
   }
 
-  if (sc & 0x80) {           /* bit 7 = 1 indica que se solto la tecla */
-    uint8_t key = sc & 0x7F; /* scancode base sin el bit de release */
+  if (sc & 0x80) {
+    uint8_t key = sc & 0x7F;
 
-    if (key == 0x2A || key == 0x36) /* shift izquierdo o derecho liberado */
+    if (key == 0x2A || key == 0x36)
       shift = 0;
-    if (key == 0x1D) /* control liberado */
+    if (key == 0x1D)
       ctrl = 0;
 
     return;
   }
 
-  if (extended) { /* ignoramos teclas extendidas por ahora */
+  if (extended) {
     extended = 0;
     return;
   }
 
-  if (sc == 0x2A || sc == 0x36) { /* shift izquierdo o derecho presionado */
+  if (sc == 0x2A || sc == 0x36) {
     shift = 1;
     return;
   }
 
-  if (sc == 0x1D) { /* control presionado */
+  if (sc == 0x1D) {
     ctrl = 1;
     return;
   }
 
-  if (sc < sizeof(kbd_map)) { /* el scancode esta dentro del keymap */
+  if (sc < sizeof(kbd_map)) {
     uint8_t c;
 
-    if (shift) {
-      c = kbd_shift_map[sc]; /* keymap con shift: mayusculas y simbolos */
-    } else {
-      c = kbd_map[sc]; /* keymap normal: minusculas y numeros */
-    }
+    if (shift)
+      c = kbd_shift_map[sc];
+    else
+      c = kbd_map[sc];
 
     if (ctrl) {
       if (c >= 'a' && c <= 'z')
-        c = c - 'a' + 1; /* Ctrl+a → 1 (SOH), …, Ctrl+z → 26 (SUB) */
+        c = c - 'a' + 1;
       else if (c >= 'A' && c <= 'Z')
-        c = c - 'A' + 1; /* Ctrl+Shift+a → 1, …, Ctrl+Shift+z → 26 */
+        c = c - 'A' + 1;
     }
+
     if (c) {
-      kbd_push((char)c); /* encolamos el caracter en el buffer circular */
+      key_event_t ev;
+      ev.mods = 0;
+      if (shift)
+        ev.mods |= KEY_MOD_SHIFT;
+      if (ctrl)
+        ev.mods |= KEY_MOD_CTRL;
+
+      if (c == '\b') {
+        ev.type = KEY_BACKSPACE;
+        ev.c = c;
+      } else if (c == '\n') {
+        ev.type = KEY_ENTER;
+        ev.c = c;
+      } else if (c == '\t') {
+        ev.type = KEY_TAB;
+        ev.c = c;
+      } else if (c == 27) {
+        ev.type = KEY_ESC;
+        ev.c = c;
+      } else {
+        ev.type = KEY_CHAR;
+        ev.c = (char)c;
+      }
+      kbd_push_key(ev);
     }
   }
 }
 
-static int keyboard_init(void) { return 0; /* No se que poner aqui */ }
+static int keyboard_init(void) { return 0; }
 
 static struct driver keyboard = {.name = "Teclado PS/2",
                                  .author = "SrTortugardo",

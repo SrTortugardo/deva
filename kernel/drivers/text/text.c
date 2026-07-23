@@ -4,10 +4,10 @@
 
 void draw_char(char c, int x, int y, uint32_t color) {
   for (int row = 0; row < 8; row++) {
-    uint8_t bits = font8x8_basic[(uint8_t)c][row];
+    uint8_t bits = font8x8_basic[(uint8_t)c][row]; /* fila de la fuente: 8 bits = 8 pixeles */
 
     for (int col = 0; col < 8; col++) {
-      if (bits & (1 << col)) {
+      if (bits & (1 << col)) {         /* si el bit esta encendido, pintamos el pixel */
         video_put_pixel(x + col, y + row, color);
       }
     }
@@ -17,7 +17,7 @@ void draw_char(char c, int x, int y, uint32_t color) {
 void draw_string(const char *str, int x, int y, uint32_t color) {
   while (*str) {
     draw_char(*str, x, y, color);
-    x += 8;
+    x += 8;    /* avanzamos 8 pixeles por caracter (ancho de la fuente) */
     str++;
   }
 }

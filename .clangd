@@ -1,6 +1,7 @@
 CompileFlags:
   Add:
     - "-I/home/srtortugardo/code/deva/kernel/include" # deberias remplazar esto con la ruta de **TU** Dispostivo
+    - "-I/home/srtortugardo/code/deva/libc/"
     - "-ffreestanding"
     - "-nostdlib"
     - "-fno-builtin"

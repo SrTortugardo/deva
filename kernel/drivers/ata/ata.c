@@ -15,30 +15,24 @@ static int selected_drive =
     -1; /* indice en drives[] del disco activo, -1 si ninguno */
 
 static int ata_wait_bsy(uint16_t io_base) {
-  /*
-   * Espera a que se baje el bit BSY (el disco dejo de procesar el comando
-   * anterior). Devuelve 0 si se libera a tiempo, -1 si se agota el tiempo.
-   */
-
   int timeout = 100000;
   while ((inb(io_base + ATA_REG_STATUS) & ATA_SR_BSY) && timeout > 0) {
-    timeout--;
+    timeout--; /* sondeamos el registro de estado hasta que BSY se apague */
   }
   return timeout > 0 ? 0 : -1;
 }
 
 static int ata_wait_drq(uint16_t io_base) {
-  /* esperar a que este listo el bit DRQ, si se acaba el tiempo pos -1 igual*/
   int timeout = 100000;
   while (!(inb(io_base + ATA_REG_STATUS) & ATA_SR_DRQ) && timeout > 0) {
-    timeout--;
+    timeout--; /* esperamos que DRQ se active: datos listos para transferir */
   }
   return timeout > 0 ? 0 : -1;
 }
 
 static void ata_400ns_delay(uint16_t io_base) {
   for (int i = 0; i < 4; i++) {
-    inb(io_base + ATA_REG_STATUS);
+    inb(io_base + ATA_REG_STATUS); /* cada lectura del status toma ~100ns */
   }
 }
 
@@ -78,12 +72,16 @@ static int ata_identify(uint16_t io_base, uint8_t drive, ata_device_t *device) {
   /* Leer las 256 words del IDENTIFY. */
   uint16_t identify[256];
   for (int i = 0; i < 256; i++) {
-    identify[i] = inw(io_base + ATA_REG_DATA);
+    identify[i] =
+        inw(io_base +
+            ATA_REG_DATA); /* 256 palabras = 512 bytes de info del disco */
   }
 
   for (int i = 0; i < 40; i += 2) {
-    device->model[i] = identify[27 + i / 2] >> 8;
-    device->model[i + 1] = identify[27 + i / 2] & 0xFF;
+    device->model[i] =
+        identify[27 + i / 2] >> 8; /* el modelo viene en words big-endian */
+    device->model[i + 1] =
+        identify[27 + i / 2] & 0xFF; /* byte alto y byte bajo */
   }
   device->model[40] = '\0';
 
@@ -211,10 +209,10 @@ int ata_write_sector(uint32_t lba, const uint8_t *buffer) {
        0xE0 | (dev->drive << 4) | ((lba >> 24) & 0x0F));
   ata_400ns_delay(io_base);
 
-  outb(io_base + ATA_REG_SECCOUNT, 1);
-  outb(io_base + ATA_REG_LBA_LO, (uint8_t)lba);
-  outb(io_base + ATA_REG_LBA_MID, (uint8_t)(lba >> 8));
-  outb(io_base + ATA_REG_LBA_HI, (uint8_t)(lba >> 16));
+  outb(io_base + ATA_REG_SECCOUNT, 1);          /* escribimos 1 sector */
+  outb(io_base + ATA_REG_LBA_LO, (uint8_t)lba); /* LBA bytes 0-7 */
+  outb(io_base + ATA_REG_LBA_MID, (uint8_t)(lba >> 8)); /* LBA bytes 8-15 */
+  outb(io_base + ATA_REG_LBA_HI, (uint8_t)(lba >> 16)); /* LBA bytes 16-23 */
 
   outb(io_base + ATA_REG_COMMAND, ATA_CMD_WRITE_PIO);
 
@@ -225,7 +223,8 @@ int ata_write_sector(uint32_t lba, const uint8_t *buffer) {
   /* 256 words = 512 bytes = un sector. outw al puerto DATA envia la data. */
   const uint16_t *buf16 = (const uint16_t *)buffer;
   for (int i = 0; i < 256; i++) {
-    outw(io_base + ATA_REG_DATA, buf16[i]);
+    outw(io_base + ATA_REG_DATA,
+         buf16[i]); /* escribimos word por word al bus ATA */
   }
 
   if (ata_wait_bsy(io_base) < 0) {
@@ -270,7 +269,8 @@ int ata_read_sector(uint32_t lba, uint8_t *buffer) {
   /* 256 words = 512 bytes. inw desde el puerto DATA entrega la data. */
   uint16_t *buf16 = (uint16_t *)buffer;
   for (int i = 0; i < 256; i++) {
-    buf16[i] = inw(io_base + ATA_REG_DATA);
+    buf16[i] =
+        inw(io_base + ATA_REG_DATA); /* leemos word por word del bus ATA */
   }
 
   return 0;

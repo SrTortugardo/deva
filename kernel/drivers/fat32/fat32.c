@@ -87,7 +87,10 @@ static uint32_t fat_read(uint32_t cluster) {
   uint32_t off = fat_offset % fs.bytes_per_sector;
 
   if (sector != fat_cache_sector) {
-    ata_read_sector(sector, fat_cache);
+    if (ata_read_sector(sector, fat_cache) < 0) {
+      fat_cache_sector = 0xFFFFFFFF;
+      return 0;
+    }
     fat_cache_sector = sector;
   }
   return *(uint32_t *)(fat_cache + off) & FAT_MASK;

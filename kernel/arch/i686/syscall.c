@@ -158,7 +158,13 @@ void syscall_handler_c(struct regs *r) {
     term_clear();
     r->eax = 0;
     break;
-
+  case SYS_GET_CPU_CYCLES: {
+    uint64_t cycles;
+    __asm__ volatile("rdtsc" : "=A"(cycles));
+    r->eax = (uint32_t)(cycles & 0xFFFFFFFF);
+    r->edx = (uint32_t)(cycles >> 32);
+    break;
+  }
   /* --- memoria --- */
   case SYS_MALLOC:
     r->eax = (uint32_t)malloc((size_t)r->ebx);

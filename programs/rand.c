@@ -1,7 +1,5 @@
 #include <io.h>
 #include <stdlib.h>
-#include <string.h>
-#include <vfs.h>
 
 __attribute__((naked)) void _start(void) {
   __asm__ volatile("mov 0(%%esp), %%ecx\n\t"
@@ -19,24 +17,31 @@ __attribute__((naked)) void _start(void) {
 }
 
 int main(int argc, char **argv) {
-  if (argc < 3) /* se necesitan origen y destino */
-    return 1;
+  int r = rand();
+  char buf[16];
+  int i = 0;
+  int neg = 0;
 
-  vfs_stat_t st;
-  if (vfs_stat(argv[1], &st) < 0) /* obtener tamaño del origen */
-    return 1;
-
-  char *buf = malloc(st.size); /* buffer temporal para el contenido */
-  if (!buf)
-    return 1;
-
-  int n = vfs_read(argv[1], buf, st.size); /* leer archivo fuente */
-  if (n < 0) {
-    free(buf);
-    return 1;
+  if (r < 0) {
+    neg = 1;
+    r = -r;
   }
 
-  int ret = vfs_write(argv[2], buf, n); /* escribir en el destino */
-  free(buf);
-  return ret < 0 ? 1 : 0;
+  do {
+    buf[i++] = (r % 10) + '0';
+    r /= 10;
+  } while (r > 0);
+
+  if (neg)
+    buf[i++] = '-';
+
+  for (int j = 0; j < i / 2; j++) {
+    char t = buf[j];
+    buf[j] = buf[i - 1 - j];
+    buf[i - 1 - j] = t;
+  }
+  buf[i] = '\n';
+  write(1, buf, i + 1);
+
+  return 0;
 }

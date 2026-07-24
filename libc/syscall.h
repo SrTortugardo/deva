@@ -29,6 +29,7 @@ enum {
   SYS_MALLOC,
   SYS_FREE,
   SYS_CLEAR,
+  SYS_GET_CPU_CYCLES,
 };
 
 /* ABI deva (i386, int $0x80):

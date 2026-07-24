@@ -41,6 +41,9 @@ enum {
 
   /* Pantalla */
   SYS_CLEAR,  /* clear()               */
+
+  /* CPU */
+  SYS_GET_CPU_CYCLES, /* get_cpu_cycles() -> contador RDTSC */
 };
 
 static inline int32_t syscall(uint32_t num, uint32_t a1, uint32_t a2,
@@ -77,6 +80,11 @@ static inline int32_t sys_exec(const char *path, int argc, const char **argv) {
 }
 static inline int32_t sys_draw_pixel(uint32_t x, uint32_t y, uint32_t rgb) {
   return syscall(SYS_DRAW_PIXEL, x, y, rgb, 0, 0);
+}
+static inline uint64_t sys_get_cpu_cycles(void) {
+  uint64_t ret;
+  __asm__ volatile("rdtsc" : "=A"(ret));
+  return ret;
 }
 
 /* Handler C invocado desde isr128. */

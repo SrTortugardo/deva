@@ -77,7 +77,9 @@ libc() {
     $COMPILER $CFLAGS -c libc/string.c -o build/libc/string.o
     $COMPILER $CFLAGS -c libc/proc.c -o build/libc/proc.o
     $COMPILER $CFLAGS -c libc/vfs.c -o build/libc/vfs.o
-    $COMPILER $CFLAGS -c libc/mem.c -o build/libc/mem.o
+    $COMPILER $CFLAGS -c libc/stdlib.c -o build/libc/stdlib.o
+    $COMPILER $CFLAGS -c libc/stdlib.c -o build/libc/stdlib.o
+    $COMPILER $CFLAGS -c libc/math.c -o build/libc/math.o
 
     # Empaquetar en libc.a (archivo estatico). -rcs: replace, create, write index.
     $AR rcs build/libc/libc.a build/libc/*
@@ -97,9 +99,9 @@ programs() {
     $COMPILER $CFLAGS -c programs/cp.c      -o build/program/cp.o
     $COMPILER $CFLAGS -c programs/rm.c      -o build/program/rm.o
     $COMPILER $CFLAGS -c programs/mv.c      -o build/program/mv.o
-    $COMPILER $CFLAGS -c programs/write.c   -o build/program/write.o
     $COMPILER $CFLAGS -c programs/sh.c      -o build/program/sh.o
     $COMPILER $CFLAGS -c programs/clear.c   -o build/program/clear.o
+    $COMPILER $CFLAGS -c programs/rand.c    -o build/program/rand.o
 
     $LINKER $LDFLAGS -o disk/bin/hello      build/program/hello.o      build/libc/libc.a
     $LINKER $LDFLAGS -o disk/bin/drawbmp    build/program/drawbmp.o    build/libc/libc.a
@@ -109,9 +111,9 @@ programs() {
     $LINKER $LDFLAGS -o disk/bin/cp         build/program/cp.o         build/libc/libc.a
     $LINKER $LDFLAGS -o disk/bin/rm         build/program/rm.o         build/libc/libc.a
     $LINKER $LDFLAGS -o disk/bin/mv         build/program/mv.o         build/libc/libc.a
-    $LINKER $LDFLAGS -o disk/bin/write      build/program/write.o      build/libc/libc.a
     $LINKER $LDFLAGS -o disk/bin/sh         build/program/sh.o         build/libc/libc.a
     $LINKER $LDFLAGS -o disk/bin/clear      build/program/clear.o      build/libc/libc.a
+    $LINKER $LDFLAGS -o disk/bin/rand       build/program/rand.o       build/libc/libc.a
 }
 
 disk() {

@@ -25,8 +25,8 @@ __attribute__((naked)) void _start(void) {
 int main(int argc, char **argv) {
   char line[MAX_LINE]; /* buffer para la línea escrita */
 
-  while (1) {                        /* bucle principal del shell */
-    print_col("deva>", COLOR_GREEN); /* mostrar prompt */
+  while (1) {                      /* bucle principal del shell */
+    print_col("sh>", COLOR_GREEN); /* mostrar prompt */
     print_col(" ", COLOR_TEXT);
     int n = read(0, line, sizeof(line)); /* leer entrada del usuario */
     if (n <= 0)

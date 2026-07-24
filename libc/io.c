@@ -31,3 +31,9 @@ void clear(void) {
   /* limpia la pantalla */
   syscall(SYS_CLEAR, 0, 0, 0, 0, 0);
 }
+
+uint64_t get_cpu_cycles(void) {
+  uint64_t ret;
+  __asm__ volatile("rdtsc" : "=A"(ret));
+  return ret;
+}
